@@ -36,7 +36,12 @@ jobs:
       # A tag must name the version in mygo.json, which the build is named after.
       - name: Check the version
         if: startsWith(github.ref, 'refs/tags/v')
-        run: test "$GITHUB_REF_NAME" = "v$(jq -r .version mygo.json)"
+        run: |
+          version="$(jq -r .version mygo.json)"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match version $version in mygo.json"
+            exit 1
+          fi
 
       - name: Build
         run: go tool mygo build -platform darwin/universal
