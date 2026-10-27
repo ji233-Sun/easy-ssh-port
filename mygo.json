@@ -1,0 +1,6 @@
+{
+  "name": "Easy SSH Port",
+  "identifier": "com.ji233.easysshport",
+  "version": "0.1.0",
+  "out": "build"
+}

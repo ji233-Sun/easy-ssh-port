@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # the release of a tag
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test and build (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - name: Vet
+        run: |
+          go vet ./...
+          go tool mygo vet .
+      - name: Test
+        run: go test -race ./...
+
+      # A tag must name the version in mygo.json, which the build is named after.
+      - name: Check the version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: test "$GITHUB_REF_NAME" = "v$(jq -r .version mygo.json)"
+
+      - name: Build
+        run: go tool mygo build -platform darwin/universal
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Easy-SSH-Port-macOS
+          path: build/*/*.dmg
+          if-no-files-found: error
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" build/*/*.dmg \
+            --title "Easy SSH Port $GITHUB_REF_NAME" --generate-notes --verify-tag
